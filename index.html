@@ -206,6 +206,18 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:var(--ok);color:var(--ok)}
 .toast.fail{border-color:var(--err);color:var(--err)}
+
+/* MUSCLE HEATMAP */
+.hm-body-wrap{display:flex;gap:var(--sp4);align-items:flex-start;margin-bottom:var(--sp4)}
+.hm-legend-side{flex:1;min-width:0}
+.hm-leg-item{display:flex;align-items:center;gap:var(--sp2);padding:5px 0;border-bottom:1px solid var(--bdr)}
+.hm-leg-item:last-child{border-bottom:none}
+.hm-leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.hm-leg-name{font-size:var(--text-xs);color:var(--muted);flex:1}
+.hm-leg-vol{font-size:var(--text-xs);font-family:var(--font-mono);font-weight:700;text-align:right}
+.hm-range-wrap{display:flex;align-items:center;gap:var(--sp2);margin-top:var(--sp3);justify-content:flex-end}
+.hm-range-grad{height:6px;width:64px;border-radius:var(--r-full);background:linear-gradient(to right,var(--surf3),#e8a838)}
+.hm-range-label{font-size:0.5rem;color:var(--faint)}
 </style>
 </head>
 <body>
@@ -285,7 +297,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </svg>
         <div>
           <div style="font-weight:800">GymTracker</div>
-          <div style="font-size:var(--text-xs);color:var(--muted)">v1.0 · Built for Tanay · EVOLT 360</div>
+          <div style="font-size:var(--text-xs);color:var(--muted)">v1.1 · Built for Tanay · EVOLT 360</div>
           <div id="db-mode-badge" style="font-size:var(--text-xs);color:var(--muted);margin-top:2px"></div>
         </div>
       </div>
@@ -768,6 +780,96 @@ async function saveEditSess(id) {
 }
 
 // ═══════════════════════════════════════════════════
+// WEEKLY MUSCLE HEATMAP
+// ═══════════════════════════════════════════════════
+const MUSCLE_MAP = {
+  'Chest':     { color:'#e8733a' },
+  'Back':      { color:'#5591c7' },
+  'Shoulders': { color:'#a86fdf' },
+  'Arms':      { color:'#6daa45' },
+  'Legs':      { color:'#e8a838' },
+  'Core':      { color:'#dd6974' },
+};
+
+function hmFill(cat, vol, maxVol) {
+  const v = vol[cat]||0;
+  if (!v || !MUSCLE_MAP[cat]) return 'var(--surf3)';
+  const alpha = Math.max(0.18, Math.min(1, v/maxVol));
+  const hex = Math.round(alpha*255).toString(16).padStart(2,'0');
+  return MUSCLE_MAP[cat].color + hex;
+}
+
+async function renderMuscleHeatmap() {
+  const sessions = await getAllSess();
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-7);
+  const recent = sessions.filter(s => new Date(s.date) >= cutoff);
+  const vol = {};
+  recent.forEach(s => s.exercises.forEach(ex => {
+    const cat = ex.category||'Custom';
+    const v = ex.sets.reduce((a,st)=>a+(st.w||0)*(st.r||0),0);
+    vol[cat]=(vol[cat]||0)+v;
+  }));
+  const maxVol = Math.max(...Object.values(vol),1);
+  const daysLabel = recent.length ? `${recent.length} session${recent.length>1?'s':''} this week` : 'No sessions this week';
+
+  const ch = (cat) => hmFill(cat, vol, maxVol);
+
+  const svg = `<svg width="108" height="218" viewBox="0 0 108 218" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+  <ellipse cx="54" cy="15" rx="11" ry="13" fill="var(--surf3)" stroke="var(--bdr2)" stroke-width="1.2"/>
+  <rect x="49" y="26" width="10" height="8" rx="3" fill="var(--surf3)"/>
+  <ellipse cx="27" cy="44" rx="11" ry="8" fill="${ch('Shoulders')}" opacity="0.95"/>
+  <ellipse cx="81" cy="44" rx="11" ry="8" fill="${ch('Shoulders')}" opacity="0.95"/>
+  <path d="M35 36 Q54 30 73 36 L75 60 Q54 66 33 60 Z" fill="${ch('Chest')}" opacity="0.95"/>
+  <rect x="37" y="62" width="34" height="44" rx="5" fill="${ch('Core')}" opacity="0.9"/>
+  <rect x="20" y="36" width="13" height="50" rx="5" fill="${ch('Back')}" opacity="0.8"/>
+  <rect x="75" y="36" width="13" height="50" rx="5" fill="${ch('Back')}" opacity="0.8"/>
+  <rect x="20" y="36" width="13" height="25" rx="5" fill="${ch('Arms')}" opacity="0.75"/>
+  <rect x="75" y="36" width="13" height="25" rx="5" fill="${ch('Arms')}" opacity="0.75"/>
+  <rect x="20" y="61" width="13" height="25" rx="4" fill="${ch('Arms')}" opacity="0.5"/>
+  <rect x="75" y="61" width="13" height="25" rx="4" fill="${ch('Arms')}" opacity="0.5"/>
+  <rect x="17" y="87" width="11" height="30" rx="4" fill="var(--surf3)" stroke="var(--bdr)" stroke-width="1"/>
+  <rect x="80" y="87" width="11" height="30" rx="4" fill="var(--surf3)" stroke="var(--bdr)" stroke-width="1"/>
+  <ellipse cx="22" cy="123" rx="7" ry="8" fill="var(--surf3)" stroke="var(--bdr)" stroke-width="1"/>
+  <ellipse cx="86" cy="123" rx="7" ry="8" fill="var(--surf3)" stroke="var(--bdr)" stroke-width="1"/>
+  <rect x="35" y="108" width="16" height="52" rx="6" fill="${ch('Legs')}" opacity="0.9"/>
+  <rect x="57" y="108" width="16" height="52" rx="6" fill="${ch('Legs')}" opacity="0.9"/>
+  <rect x="35" y="162" width="16" height="26" rx="5" fill="${ch('Legs')}" opacity="0.8"/>
+  <rect x="57" y="162" width="16" height="26" rx="5" fill="${ch('Legs')}" opacity="0.8"/>
+  <rect x="37" y="190" width="12" height="24" rx="5" fill="${ch('Legs')}" opacity="0.7"/>
+  <rect x="59" y="190" width="12" height="24" rx="5" fill="${ch('Legs')}" opacity="0.7"/>
+</svg>`;
+
+  const cats = ['Chest','Back','Shoulders','Arms','Legs','Core'];
+  const legend = cats.map(cat => {
+    const v = vol[cat]||0;
+    const color = v>0 ? MUSCLE_MAP[cat].color : 'var(--surf3)';
+    return `<div class="hm-leg-item">
+      <div class="hm-leg-dot" style="background:${color}"></div>
+      <span class="hm-leg-name">${cat}</span>
+      <span class="hm-leg-vol" style="color:${v>0?MUSCLE_MAP[cat].color:'var(--faint)'}">${v>0?Math.round(v).toLocaleString()+' lbs':'—'}</span>
+    </div>`;
+  }).join('');
+
+  return `<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp3)">
+    <div class="clabel" style="margin-bottom:0">Weekly Muscle Heatmap</div>
+    <span class="badge b-muted">${daysLabel}</span>
+  </div>
+  <div class="hm-body-wrap">
+    ${svg}
+    <div class="hm-legend-side">
+      ${legend}
+      <div class="hm-range-wrap">
+        <span class="hm-range-label">Less</span>
+        <div class="hm-range-grad"></div>
+        <span class="hm-range-label">More</span>
+      </div>
+    </div>
+  </div>
+</div>`;
+}
+
+// ═══════════════════════════════════════════════════
 // PROGRESS
 // ═══════════════════════════════════════════════════
 async function renderProgress() {
@@ -789,7 +891,8 @@ async function renderProgress() {
     if (mx > 0) exMap[ex.name].push({ date:s.date.slice(0,10), mx, vol:ex.sets.reduce((a,s)=>a+(s.w*s.r),0) });
   }));
 
-  let h = `<div class="card"><div class="clabel">Volume Over Time (lbs)</div><div class="chart-wrap"><canvas id="vol-chart"></canvas></div></div><div class="clabel" style="padding:0 0 var(--sp2)">Exercise Progress</div>`;
+  const hmHtml = await renderMuscleHeatmap();
+  let h = hmHtml + `<div class="card"><div class="clabel">Volume Over Time (lbs)</div><div class="chart-wrap"><canvas id="vol-chart"></canvas></div></div><div class="clabel" style="padding:0 0 var(--sp2)">Exercise Progress</div>`;
   Object.keys(exMap).filter(n => exMap[n].length > 0).forEach(name => {
     const pr = Math.max(...exMap[name].map(e=>e.mx));
     h += `<div class="eli" onclick="openProgDetail('${esc(name)}')"><div><div class="eli-name">${name}</div><div class="eli-sub">PR: ${pr} lbs · ${exMap[name].length} sessions</div></div><i data-lucide="chevron-right"></i></div>`;
