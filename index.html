@@ -125,6 +125,20 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .sdone-btn.done{background:var(--ok-d);border-color:var(--ok)}
 .sdone-btn svg{width:16px;height:16px;color:var(--faint)}
 .sdone-btn.done svg{color:var(--ok)}
+
+/* QUICK-ACTION MICRO BUTTONS (Feature 1) */
+.btn-micro{display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;border-radius:var(--r-sm);font-size:0.58rem;font-weight:700;font-family:var(--font-mono);background:var(--surf3);border:1px solid var(--bdr);color:var(--muted);min-height:32px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all var(--ease)}
+.btn-micro:active{transform:scale(0.92);background:var(--surf2)}
+.btn-micro.acc{background:var(--acc-d);border-color:var(--acc);color:var(--acc)}
+.set-quick-row{padding:var(--sp1) var(--sp4) var(--sp2);display:flex;align-items:center;gap:var(--sp2);flex-wrap:wrap;border-bottom:1px solid var(--bdr)}
+
+/* EXERCISE REORDER BUTTONS (Feature 2) */
+.ex-order-btns{display:flex;flex-direction:column;gap:2px;margin-right:var(--sp2)}
+.btn-order{width:28px;height:24px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;background:var(--surf3);border:1px solid var(--bdr);cursor:pointer;transition:all var(--ease)}
+.btn-order svg{width:13px;height:13px;color:var(--muted)}
+.btn-order:disabled{opacity:0.25;cursor:default}
+.btn-order:not(:disabled):active{background:var(--surf2)}
+
 .add-set-row{padding:var(--sp3) var(--sp4);display:flex;gap:var(--sp2)}
 .prev-best{background:var(--surf3);border-top:1px solid var(--bdr);padding:var(--sp2) var(--sp4);font-size:var(--text-xs);color:var(--muted);display:flex;align-items:center;gap:var(--sp2)}
 .prev-best svg{width:12px;height:12px;flex-shrink:0;color:var(--acc)}
@@ -206,6 +220,19 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .toast.show{transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:var(--ok);color:var(--ok)}
 .toast.fail{border-color:var(--err);color:var(--err)}
+
+/* MONTHLY CALENDAR (Feature 3) */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin:var(--sp3) 0 var(--sp4)}
+.cal-dh{font-size:0.48rem;color:var(--faint);text-transform:uppercase;text-align:center;font-weight:700;letter-spacing:0.06em;padding-bottom:4px}
+.cal-cell{aspect-ratio:1;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-family:var(--font-mono);font-weight:700;cursor:default;position:relative;transition:all var(--ease)}
+.cal-cell.empty{background:none}
+.cal-cell.today{outline:2px solid var(--acc);outline-offset:-1px}
+.cal-cell.trained{background:var(--acc-d);color:var(--acc);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.cal-cell.trained:active{transform:scale(0.88)}
+.cal-cell.rest{background:var(--surf2);color:var(--faint)}
+.cal-cell.future{background:none;color:var(--faint)}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp2)}
+.cal-month{font-size:var(--text-sm);font-weight:800}
 
 /* MUSCLE HEATMAP */
 .hm-body-wrap{display:flex;gap:var(--sp4);align-items:flex-start;margin-bottom:var(--sp4)}
@@ -309,7 +336,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </svg>
         <div>
           <div style="font-weight:800">GymTracker</div>
-          <div style="font-size:var(--text-xs);color:var(--muted)">v1.1 · Built for Tanay · EVOLT 360</div>
+          <div style="font-size:var(--text-xs);color:var(--muted)">v1.2 · Built for Tanay · EVOLT 360</div>
           <div id="db-mode-badge" style="font-size:var(--text-xs);color:var(--muted);margin-top:2px"></div>
         </div>
       </div>
@@ -414,12 +441,8 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 // ═══════════════════════════════════════════════════
 // DATABASE LAYER — IndexedDB with in-memory fallback
 // ═══════════════════════════════════════════════════
-let DB_MODE = 'memory'; // 'idb' or 'memory'
-
-// In-memory store (fallback and preview mode)
+let DB_MODE = 'memory';
 let memStore = { sessions: [], exercises: [], nextId: { sessions: 1, exercises: 1 } };
-
-// IndexedDB wrapper (native, no external lib needed)
 let idbDB = null;
 
 async function initDB() {
@@ -447,7 +470,6 @@ async function initDB() {
   await seedExercises();
 }
 
-// Generic DB ops
 async function dbGetAll(store) {
   if (DB_MODE === 'idb') {
     return new Promise((resolve, reject) => {
@@ -545,6 +567,7 @@ let activeDay = null, wip = false, wStart = null, wTimer = null;
 let curSets = {}, curExes = [];
 let editSessCache = {};
 let progChart = null;
+let volRange = 14; // 14 = 14-day bars, 28 = 4-week aggregated
 
 // ═══════════════════════════════════════════════════
 // NAVIGATION
@@ -636,8 +659,6 @@ async function startWorkout() {
   all.filter(e => e.custom && e.days && e.days.includes(activeDay)).forEach(e => {
     curExes.push({ name:e.name, ds:e.defaultSets, dr:e.defaultReps, cat:e.category });
   });
-  //curExes.forEach(e => { curSets[e.name] = Array.from({length:e.ds}, () => ({w:'', r:e.dr, done:false})); });
-  // NEW: prefill Core exercises with saved body weight
   const bw = getBodyWeight();
   curExes.forEach(e => {
     const defaultW = (e.cat === 'Core' && bw) ? bw : '';
@@ -645,7 +666,7 @@ async function startWorkout() {
       { length: e.ds },
       () => ({ w: defaultW, r: e.dr, done: false })
     );
-  })
+  });
   wTimer = setInterval(updateTimer, 1000);
   renderActiveWorkout();
 }
@@ -665,11 +686,20 @@ async function renderActiveWorkout() {
   for (const ex of curExes) {
     const sets = curSets[ex.name] || [];
     const pb = getPrevBest(allSess, ex.name);
-    h += `<div class="ex-block"><div class="ex-hdr"><div><div class="ex-name">${ex.name}</div><div class="ex-cat">${ex.cat}</div></div><button class="btn-icon btn-g" onclick="rmExFromWo('${esc(ex.name)}')" title="Remove"><i data-lucide="x"></i></button></div>`;
+    const exIdx = curExes.indexOf(ex);
+    const isFirst = exIdx === 0;
+    const isLast  = exIdx === curExes.length - 1;
+    // Exercise header with reorder buttons (Feature 2)
+    h += `<div class="ex-block"><div class="ex-hdr"><div class="ex-order-btns"><button class="btn-order" onclick="moveEx(${exIdx},-1)" ${isFirst?'disabled':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg></button><button class="btn-order" onclick="moveEx(${exIdx},1)" ${isLast?'disabled':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button></div><div style="flex:1"><div class="ex-name">${ex.name}</div><div class="ex-cat">${ex.cat}</div></div><button class="btn-icon btn-g" onclick="rmExFromWo('${esc(ex.name)}')" title="Remove"><i data-lucide="x"></i></button></div>`;
     if (pb) h += `<div class="prev-best"><i data-lucide="history"></i> Last: ${pb}</div>`;
     h += `<table class="sets-tbl"><thead><tr><th>Set</th><th>lbs</th><th>Reps</th><th>✓</th></tr></thead><tbody>`;
     sets.forEach((set, si) => {
+      const hasW = parseFloat(set.w) > 0;
       h += `<tr class="set-row"><td>S${si+1}</td><td><input class="sinp" type="number" inputmode="decimal" step="0.5" placeholder="lbs" value="${set.w}" onchange="updSet('${esc(ex.name)}',${si},'w',this.value)"></td><td><input class="sinp" type="number" inputmode="numeric" placeholder="reps" value="${set.r}" onchange="updSet('${esc(ex.name)}',${si},'r',this.value)"></td><td><button class="sdone-btn${set.done?' done':''}" onclick="toggleDone('${esc(ex.name)}',${si})"><i data-lucide="${set.done?'check-circle-2':'circle'}"></i></button></td></tr>`;
+      // Quick-action row: ±5 lbs + Copy prev (Feature 1)
+      if (hasW || si > 0) {
+        h += `<tr><td colspan="4"><div class="set-quick-row"><span style="font-size:0.55rem;color:var(--faint);text-transform:uppercase;letter-spacing:0.07em">Quick:</span><button class="btn-micro" onclick="adjustW('${esc(ex.name)}',${si},-5)">−5</button><button class="btn-micro" onclick="adjustW('${esc(ex.name)}',${si},+5)">+5</button>${si>0?`<button class="btn-micro acc" onclick="copyLastSet('${esc(ex.name)}',${si})">Copy prev</button>`:''}</div></td></tr>`;
+      }
     });
     h += `</tbody></table><div class="add-set-row"><button class="btn btn-s" style="font-size:var(--text-xs);padding:var(--sp2) var(--sp4)" onclick="addSet('${esc(ex.name)}')"><i data-lucide="plus"></i>&nbsp;Add Set</button><button class="btn btn-g" style="font-size:var(--text-xs)" onclick="rmLastSet('${esc(ex.name)}')">Remove Last</button></div></div>`;
   }
@@ -688,10 +718,37 @@ function getPrevBest(sessions, name) {
   return null;
 }
 function updSet(name, si, f, v) { if (curSets[name]) curSets[name][si][f] = v; }
+
+// Feature 1: ±5 lbs quick adjust
+function adjustW(name, si, delta) {
+  if (!curSets[name]) return;
+  const cur = parseFloat(curSets[name][si].w) || 0;
+  const next = Math.max(0, cur + delta);
+  curSets[name][si].w = next % 1 === 0 ? String(next) : next.toFixed(1);
+  renderActiveWorkout();
+}
+
+// Feature 1: Copy previous set weight+reps
+function copyLastSet(name, si) {
+  if (!curSets[name] || si < 1) return;
+  const prev = curSets[name][si-1];
+  curSets[name][si].w = prev.w;
+  curSets[name][si].r = prev.r;
+  renderActiveWorkout();
+}
+
 function toggleDone(name, si) { curSets[name][si].done = !curSets[name][si].done; renderActiveWorkout(); }
 function addSet(name) { const l = curSets[name].slice(-1)[0]; curSets[name].push({w:l?l.w:'',r:l?l.r:10,done:false}); renderActiveWorkout(); }
 function rmLastSet(name) { if (curSets[name].length > 1) { curSets[name].pop(); renderActiveWorkout(); } }
 function rmExFromWo(name) { curExes = curExes.filter(e => e.name !== name); delete curSets[name]; renderActiveWorkout(); }
+
+// Feature 2: Reorder exercises up/down
+function moveEx(idx, dir) {
+  const to = idx + dir;
+  if (to < 0 || to >= curExes.length) return;
+  [curExes[idx], curExes[to]] = [curExes[to], curExes[idx]];
+  renderActiveWorkout();
+}
 
 async function openAddToWo() {
   const all = await dbGetAll('exercises');
@@ -738,6 +795,69 @@ function discardWorkout() {
 }
 
 // ═══════════════════════════════════════════════════
+// MONTHLY CALENDAR OVERVIEW (Feature 3)
+// ═══════════════════════════════════════════════════
+let calState = { year: new Date().getFullYear(), month: new Date().getMonth() };
+
+async function renderCalendar() {
+  const sessions = await getAllSess();
+  const trainedDays = new Set(sessions.map(s => s.date.slice(0,10)));
+  const sesssByDate = {};
+  sessions.forEach(s => { const d=s.date.slice(0,10); if(!sesssByDate[d])sesssByDate[d]=[]; sesssByDate[d].push(s); });
+
+  const y = calState.year, m = calState.month;
+  const first = new Date(y, m, 1).getDay();
+  const days  = new Date(y, m+1, 0).getDate();
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0,10);
+  const monthName = new Date(y,m,1).toLocaleDateString('en-CA',{month:'long',year:'numeric'});
+
+  let h = `<div class="card"><div class="cal-nav">`;
+  h += `<button class="btn-icon" style="width:34px;height:34px" onclick="calNav(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M15 18l-6-6 6-6"/></svg></button>`;
+  h += `<span class="cal-month">${monthName}</span>`;
+  h += `<button class="btn-icon" style="width:34px;height:34px" onclick="calNav(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M9 18l6-6-6-6"/></svg></button>`;
+  h += `</div><div class="cal-grid">`;
+  ['S','M','T','W','T','F','S'].forEach(d => h += `<div class="cal-dh">${d}</div>`);
+  for (let i=0;i<first;i++) h += `<div class="cal-cell empty"></div>`;
+  for (let d=1;d<=days;d++) {
+    const ds = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isFuture = ds > todayStr;
+    const isToday  = ds === todayStr;
+    const isTrained = trainedDays.has(ds);
+    let cls = 'cal-cell ';
+    if (isFuture) cls += 'future';
+    else if (isTrained) cls += 'trained';
+    else cls += 'rest';
+    if (isToday) cls += ' today';
+    const onclick = isTrained ? `onclick="calOpenDay('${ds}')"` : '';
+    h += `<div class="${cls}" ${onclick}>${d}</div>`;
+  }
+  h += `</div></div>`;
+  return h;
+}
+
+function calNav(dir) {
+  calState.month += dir;
+  if (calState.month > 11) { calState.month = 0; calState.year++; }
+  if (calState.month < 0)  { calState.month = 11; calState.year--; }
+  renderHistory();
+}
+
+async function calOpenDay(dateStr) {
+  const sessions = await getAllSess();
+  const daySess = sessions.filter(s => s.date.slice(0,10) === dateStr);
+  if (!daySess.length) return;
+  if (daySess.length === 1) { openSessDetail(daySess[0].id); return; }
+  const el = document.createElement('div');
+  el.className = 'mo open';
+  const d = new Date(dateStr + 'T12:00:00');
+  const label = d.toLocaleDateString('en-CA',{weekday:'long',month:'long',day:'numeric'});
+  el.innerHTML = `<div class="modal"><div class="modal-handle"></div><div class="modal-title">${label}</div>${daySess.map(s=>`<div class="sc" onclick="this.closest('.mo').remove();openSessDetail(${s.id})"><div class="sc-title">${s.day} · ${s.focus}</div><div style="font-size:var(--text-xs);color:var(--muted);margin-top:4px">${s.exercises.length} exercises · ${(s.volume||0).toLocaleString()} lbs</div></div>`).join('')}<button class="btn btn-s btn-fw" style="margin-top:var(--sp3)" onclick="this.closest('.mo').remove()">Close</button></div>`;
+  el.onclick = e => { if(e.target===el) el.remove(); };
+  document.body.appendChild(el);
+}
+
+// ═══════════════════════════════════════════════════
 // HISTORY
 // ═══════════════════════════════════════════════════
 async function getAllSess() { const a = await dbGetAll('sessions'); return a.sort((a,b) => new Date(b.date)-new Date(a.date)); }
@@ -752,7 +872,8 @@ async function renderHistory() {
   }
   const streak = calcStreak(sessions);
   const totalVol = sessions.reduce((a,b) => a+(b.volume||0), 0);
-  let h = `<div class="streak"><div class="streak-num">${streak}</div><div><div style="font-weight:800">Day Streak 🔥</div><div style="font-size:var(--text-xs);color:var(--muted)">${sessions.length} total sessions</div></div></div><div class="kpi-grid"><div class="kpi-card"><div class="kpi-val">${sessions.length}</div><div class="kpi-label">Sessions</div></div><div class="kpi-card"><div class="kpi-val">${Math.round(totalVol/1000)}K</div><div class="kpi-label">Total lbs</div></div></div>`;
+  const calHtml = await renderCalendar();
+  let h = calHtml + `<div class="streak"><div class="streak-num">${streak}</div><div><div style="font-weight:800">Day Streak 🔥</div><div style="font-size:var(--text-xs);color:var(--muted)">${sessions.length} total sessions</div></div></div><div class="kpi-grid"><div class="kpi-card"><div class="kpi-val">${sessions.length}</div><div class="kpi-label">Sessions</div></div><div class="kpi-card"><div class="kpi-val">${Math.round(totalVol/1000)}K</div><div class="kpi-label">Total lbs</div></div></div>`;
   sessions.forEach(s => {
     const d = new Date(s.date);
     h += `<div class="sc" onclick="openSessDetail(${s.id})"><div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div class="sc-date">${d.toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</div><div class="sc-title">${s.day} · ${s.focus}</div></div><span class="badge b-muted">${s.exercises.length} ex</span></div><div class="sc-stats"><div class="sc-stat"><div class="sc-sv">${s.exercises.length}</div><div class="sc-sl">Exercises</div></div><div class="sc-stat"><div class="sc-sv">${s.exercises.reduce((a,e)=>a+e.sets.length,0)}</div><div class="sc-sl">Sets</div></div><div class="sc-stat"><div class="sc-sv">${(s.volume||0).toLocaleString()}</div><div class="sc-sl">lbs vol</div></div><div class="sc-stat"><div class="sc-sv">${fmtDur(s.duration||0)}</div><div class="sc-sl">Time</div></div></div></div>`;
@@ -896,7 +1017,7 @@ async function renderMuscleHeatmap() {
 }
 
 // ═══════════════════════════════════════════════════
-// PROGRESS
+// PROGRESS (Feature 4: 4-week toggle)
 // ═══════════════════════════════════════════════════
 async function renderProgress() {
   const sessions = await getAllSess();
@@ -905,10 +1026,31 @@ async function renderProgress() {
     c.innerHTML = `<div class="empty"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg><h3>No data yet</h3><p>Log some workouts to see your progress</p></div>`;
     lucide.createIcons(); return;
   }
+
+  // Build volByDate across all sessions
   const volByDate = {};
   sessions.slice().reverse().forEach(s => { const d=s.date.slice(0,10); volByDate[d]=(volByDate[d]||0)+(s.volume||0); });
-  const vDates = Object.keys(volByDate).slice(-14);
-  const vData  = vDates.map(d => volByDate[d]);
+
+  // Compute chart labels/data based on volRange (Feature 4)
+  let vDates, vData;
+  if (volRange === 14) {
+    vDates = Object.keys(volByDate).slice(-14);
+    vData  = vDates.map(d => volByDate[d]);
+  } else {
+    // 4-week aggregation — group by week start (Monday)
+    const weekMap = {};
+    Object.entries(volByDate).forEach(([d, v]) => {
+      const dt = new Date(d);
+      const day = dt.getDay();
+      const diff = (day === 0 ? -6 : 1 - day);
+      const mon = new Date(dt); mon.setDate(dt.getDate() + diff);
+      const wk = mon.toISOString().slice(0,10);
+      weekMap[wk] = (weekMap[wk]||0) + v;
+    });
+    const wks = Object.keys(weekMap).sort().slice(-4);
+    vDates = wks;
+    vData  = wks.map(w => weekMap[w]);
+  }
 
   const exMap = {};
   sessions.forEach(s => s.exercises.forEach(ex => {
@@ -918,7 +1060,8 @@ async function renderProgress() {
   }));
 
   const hmHtml = await renderMuscleHeatmap();
-  let h = hmHtml + `<div class="card"><div class="clabel">Volume Over Time (lbs)</div><div class="chart-wrap"><canvas id="vol-chart"></canvas></div></div><div class="clabel" style="padding:0 0 var(--sp2)">Exercise Progress</div>`;
+  const toggleHtml = `<div style="display:flex;gap:var(--sp2);justify-content:flex-end;margin-bottom:var(--sp2)"><button class="btn-micro${volRange===14?' acc':''}" onclick="setVolRange(14)">14 days</button><button class="btn-micro${volRange===28?' acc':''}" onclick="setVolRange(28)">4 weeks</button></div>`;
+  let h = hmHtml + `<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp2)"><div class="clabel" style="margin-bottom:0">Volume Over Time (lbs)</div></div>${toggleHtml}<div class="chart-wrap"><canvas id="vol-chart"></canvas></div></div><div class="clabel" style="padding:0 0 var(--sp2)">Exercise Progress</div>`;
   Object.keys(exMap).filter(n => exMap[n].length > 0).forEach(name => {
     const pr = Math.max(...exMap[name].map(e=>e.mx));
     h += `<div class="eli" onclick="openProgDetail('${esc(name)}')"><div><div class="eli-name">${name}</div><div class="eli-sub">PR: ${pr} lbs · ${exMap[name].length} sessions</div></div><i data-lucide="chevron-right"></i></div>`;
@@ -928,10 +1071,13 @@ async function renderProgress() {
   if (progChart) progChart.destroy();
   progChart = new Chart(document.getElementById('vol-chart').getContext('2d'), {
     type:'bar',
-    data:{ labels:vDates.map(d=>{ const dt=new Date(d); return dt.toLocaleDateString('en-CA',{month:'short',day:'numeric'}); }), datasets:[{label:'Volume',data:vData,backgroundColor:'rgba(232,168,56,0.22)',borderColor:'#e8a838',borderWidth:2,borderRadius:6,borderSkipped:false}] },
+    data:{ labels:vDates.map(d=>{ const dt=new Date(d+'T12:00:00'); return (volRange===28?'Wk ':'')+dt.toLocaleDateString('en-CA',{month:'short',day:'numeric'}); }), datasets:[{label:'Volume',data:vData,backgroundColor:'rgba(232,168,56,0.22)',borderColor:'#e8a838',borderWidth:2,borderRadius:6,borderSkipped:false}] },
     options:{ responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.y.toLocaleString()+' lbs'}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a7876',font:{size:10},maxRotation:45}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a7876',font:{size:10},callback:v=>(v/1000).toFixed(1)+'K'}}} }
   });
 }
+
+// Feature 4: toggle volume range
+function setVolRange(r) { volRange = r; renderProgress(); }
 
 async function openProgDetail(name) {
   const sessions = await getAllSess();
@@ -954,7 +1100,7 @@ async function openProgDetail(name) {
   lucide.createIcons(); openModal('m-prog-detail');
   new Chart(document.getElementById('ex-chart').getContext('2d'), {
     type:'line',
-    data:{ labels:entries.map(e=>{ const dt=new Date(e.date); return dt.toLocaleDateString('en-CA',{month:'short',day:'numeric'}); }), datasets:[{label:'Max Weight',data:entries.map(e=>e.mx),borderColor:'#e8a838',backgroundColor:'rgba(232,168,56,0.1)',tension:0.35,fill:true,pointBackgroundColor:'#e8a838',pointRadius:4}] },
+    data:{ labels:entries.map(e=>{ const dt=new Date(e.date+'T12:00:00'); return dt.toLocaleDateString('en-CA',{month:'short',day:'numeric'}); }), datasets:[{label:'Max Weight',data:entries.map(e=>e.mx),borderColor:'#e8a838',backgroundColor:'rgba(232,168,56,0.1)',tension:0.35,fill:true,pointBackgroundColor:'#e8a838',pointRadius:4}] },
     options:{ responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a7876',font:{size:10},maxRotation:45}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a7876',font:{size:10}}}} }
   });
 }
@@ -1114,7 +1260,7 @@ function getBodyWeight() {
 }
 
 // ═══════════════════════════════════════════════════
-// PWA (safe — won't crash if blocked)
+// PWA
 // ═══════════════════════════════════════════════════
 function setupPWA() {
   try {
@@ -1146,7 +1292,6 @@ async function init() {
   }
   setupPWA();
 
-  // NEW: hydrate body weight if it exists
   try {
     const bw = parseFloat(localStorage.getItem('gt_bw'));
     if (!isNaN(bw) && bw > 0) {
